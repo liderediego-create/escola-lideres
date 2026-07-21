@@ -344,7 +344,7 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
     if (!form.nome) return
     try {
       if (editando) {
-        const { error } = await supabase.from('usuarios').update({ nome: form.nome, email: form.email }).eq('id', editando)
+        const { error } = await supabase.from('usuarios').update({ nome: form.nome, email: form.email || null }).eq('id', editando)
         if (error) { alert('Erro ao editar: ' + error.message); return }
         // Atualiza turma se selecionada
         if (turmaSelecionada) {
