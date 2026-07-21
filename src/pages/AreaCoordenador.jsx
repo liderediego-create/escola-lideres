@@ -710,15 +710,17 @@ function GerenciarEquipe({ onAtualizar, setMsg }) {
   }
 
   async function salvar() {
-    if (!form.nome || !form.matricula || !form.senha_hash) return
+    if (!form.nome || !form.matricula) return
+    if (!editando && !form.senha_hash) return
     if (editando) {
-      await supabase.from('usuarios').update({
+      const dados = {
         nome: form.nome,
         matricula: form.matricula.toUpperCase(),
         email: form.email,
-        senha_hash: form.senha_hash,
         perfil: form.perfil,
-      }).eq('id', editando)
+      }
+      if (form.senha_hash) dados.senha_hash = form.senha_hash
+      await supabase.from('usuarios').update(dados).eq('id', editando)
     } else {
       await supabase.from('usuarios').insert({
         ...form,
@@ -820,7 +822,7 @@ function GerenciarEquipe({ onAtualizar, setMsg }) {
               <button
                 className="btn btn-primary"
                 onClick={salvar}
-                disabled={!form.nome || !form.matricula || !form.senha_hash}
+                disabled={!form.nome || !form.matricula || (!editando && !form.senha_hash)}
               >
                 Salvar
               </button>
