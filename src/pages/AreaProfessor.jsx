@@ -202,21 +202,32 @@ function FazerChamada({ turma, matriculas, aulas, frequencias, usuario, aulaAtua
                     <p style={{ fontSize: 11, color: '#718096' }}>{m.aluno?.matricula} · {faltas} falta{faltas !== 1 ? 's' : ''}{faltas >= 3 ? ' ⚠️' : ''}</p>
                   </div>
 
-                  <div className="freq-grid">
+                  <div style={{ display: 'flex', gap: 4 }}>
                     {[
-                      { st: 'presente', icon: '✅', cls: 'freq-presente', label: 'Presente' },
-                      { st: 'falta', icon: '❌', cls: 'freq-falta', label: 'Falta' },
-                      { st: 'falta_justificada', icon: '📝', cls: 'freq-justificada', label: 'Justificada' },
-                    ].map(op => (
-                      <button
-                        key={op.st}
-                        className={`freq-btn ${op.cls} ${chamada[m.id] === op.st ? 'ativo' : ''}`}
-                        title={op.label}
-                        onClick={() => setChamada(prev => ({ ...prev, [m.id]: op.st }))}
-                      >
-                        {op.icon}
-                      </button>
-                    ))}
+                      { s: 'presente', l: 'P', bg: '#d8f3dc', color: '#1b4332', border: '#40916c' },
+                      { s: 'falta', l: 'F', bg: '#fee2e2', color: '#9b1c1c', border: '#f87171' },
+                      { s: 'falta_justificada', l: 'FJ', bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+                    ].map(op => {
+                      const ativo = chamada[m.id] === op.s
+                      return (
+                        <button
+                          key={op.s}
+                          onClick={() => setChamada(prev => ({ ...prev, [m.id]: op.s }))}
+                          style={{
+                            width: op.l === 'FJ' ? 36 : 30, height: 30,
+                            borderRadius: 6,
+                            border: `2px solid ${ativo ? op.border : '#e2e8f0'}`,
+                            background: ativo ? op.bg : '#fff',
+                            color: ativo ? op.color : '#bbb',
+                            fontWeight: 800, fontSize: 11,
+                            cursor: 'pointer',
+                            transition: 'all 0.1s',
+                          }}
+                        >
+                          {op.l}
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {chamada[m.id] === 'falta_justificada' && (
@@ -277,12 +288,19 @@ function DiarioCompleto({ turma, matriculas, aulas, frequencias, cor }) {
                     <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{m.aluno?.nome}</td>
                     {aulas.map(a => {
                       const st = getStatus(m.id, a.id)
+                      const cMap = {
+                        presente: { bg: '#d8f3dc', color: '#1b4332', border: '#40916c', l: 'P' },
+                        falta: { bg: '#fee2e2', color: '#9b1c1c', border: '#f87171', l: 'F' },
+                        falta_justificada: { bg: '#fef3c7', color: '#92400e', border: '#fcd34d', l: 'FJ' },
+                      }
+                      const c = cMap[st]
                       return (
-                        <td key={a.id} style={{ textAlign: 'center' }}>
-                          {st === 'presente' && '✅'}
-                          {st === 'falta' && '❌'}
-                          {st === 'falta_justificada' && '📝'}
-                          {!st && <span style={{ color: '#ddd' }}>—</span>}
+                        <td key={a.id} style={{ textAlign: 'center', padding: '6px 4px' }}>
+                          {c ? (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: c.bg, border: `2px solid ${c.border}`, color: c.color, fontWeight: 800, fontSize: 11 }}>
+                              {c.l}
+                            </div>
+                          ) : <span style={{ color: '#ddd' }}>—</span>}
                         </td>
                       )
                     })}

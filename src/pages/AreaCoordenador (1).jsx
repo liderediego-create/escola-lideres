@@ -502,9 +502,28 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
 // ── VER FREQUÊNCIA ────────────────────────────────────────
 function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) {
   const [turmaSel, setTurmaSel] = useState(turmas[0]?.id || '')
+  const [aulaSel, setAulaSel] = useState(null)
+  const [chamada, setChamada] = useState({})
+  const [salvando, setSalvando] = useState(false)
+  const [msg, setMsg] = useState('')
 
   const mats = matriculas.filter(m => m.turma_id === turmaSel)
   const aulasT = aulas.filter(a => a.turma_id === turmaSel).sort((a, b) => a.numero - b.numero)
+  const turmaAtual = turmas.find(t => t.id === turmaSel)
+  const cor = turmaAtual ? COR_MODULO[turmaAtual.modulo] : COR_MODULO[1]
+
+  // Quando muda a aula, carrega frequências existentes
+  useState(() => {
+    if (!aulaSel) return
+    const aulaObj = aulasT.find(a => a.id === aulaSel)
+    if (!aulaObj) return
+    const inicial = {}
+    mats.forEach(m => {
+      const f = frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === aulaSel)
+      inicial[m.id] = f?.status || 'presente'
+    })
+    setChamada(inicial)
+  }, [aulaSel])
 
   function getStatus(matriculaId, aulaId) {
     return frequencias.find(f => f.matricula_id === matriculaId && f.aula_id === aulaId)?.status || null
@@ -514,29 +533,159 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
     return frequencias.filter(f => f.matricula_id === matriculaId && f.status === 'falta').length
   }
 
-  const turmaAtual = turmas.find(t => t.id === turmaSel)
-  const cor = turmaAtual ? COR_MODULO[turmaAtual.modulo] : COR_MODULO[1]
+  function toggleStatus(matId) {
+    setChamada(prev => {
+      const atual = prev[matId] || 'presente'
+      const proximo = atual === 'presente' ? 'falta' : atual === 'falta' ? 'falta_justificada' : 'presente'
+      return { ...prev, [matId]: proximo }
+    })
+  }
+
+  function setStatusDireto(matId, status) {
+    setChamada(prev => ({ ...prev, [matId]: status }))
+  }
+
+  async function salvarChamada() {
+    if (!aulaSel) return
+    setSalvando(true)
+    for (const m of mats) {
+      const status = chamada[m.id] || 'presente'
+      const freqExist = frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaSel)
+      if (freqExist) {
+        await supabase.from('frequencias').update({ status }).eq('id', freqExist.id)
+      } else {
+        await supabase.from('frequencias').insert({ matricula_id: m.id, aula_id: aulaSel, status })
+      }
+    }
+    setSalvando(false)
+    onAtualizar()
+    setMsg('Chamada salva!')
+    setTimeout(() => setMsg(''), 3000)
+  }
+
+  function corCelula(st) {
+    if (st === 'presente') return { bg: '#d8f3dc', color: '#1b4332', border: '#40916c' }
+    if (st === 'falta') return { bg: '#fee2e2', color: '#9b1c1c', border: '#f87171' }
+    if (st === 'falta_justificada') return { bg: '#fef3c7', color: '#92400e', border: '#fcd34d' }
+    return { bg: '#f8fafc', color: '#999', border: '#e2e8f0' }
+  }
+
+  function labelStatus(st) {
+    if (st === 'presente') return 'P'
+    if (st === 'falta') return 'F'
+    if (st === 'falta_justificada') return 'FJ'
+    return '—'
+  }
 
   return (
     <>
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ color: '#1b4332' }}>FREQUÊNCIA</h1>
-          <p className="page-subtitle">Visualização geral do diário</p>
+          <p className="page-subtitle">{aulaSel ? 'Fazendo chamada — clique na célula para alternar P → F → FJ' : 'Selecione uma aula para lançar a chamada'}</p>
         </div>
-        {turmaSel && <ImprimirDiario turma={turmaAtual} matriculas={mats} aulas={aulasT} frequencias={frequencias} />}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {aulaSel && (
+            <button className="btn btn-primary" style={{ background: '#2d6a4f' }} onClick={salvarChamada} disabled={salvando}>
+              {salvando ? 'Salvando...' : '💾 Salvar Chamada'}
+            </button>
+          )}
+          {turmaSel && <ImprimirDiario turma={turmaAtual} matriculas={mats} aulas={aulasT} frequencias={frequencias} />}
+        </div>
       </div>
 
-      <div className="form-group" style={{ maxWidth: 400, marginBottom: 20 }}>
-        <label>Selecionar Turma</label>
-        <select value={turmaSel} onChange={e => setTurmaSel(e.target.value)}>
-          {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
-        </select>
+      {msg && <div className="msg-ok" style={{ marginBottom: 12 }}>{msg}</div>}
+
+      {/* Seleção de turma e aula */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div className="form-group" style={{ minWidth: 280, marginBottom: 0 }}>
+          <label>Turma</label>
+          <select value={turmaSel} onChange={e => { setTurmaSel(e.target.value); setAulaSel(null) }}>
+            {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
+          </select>
+        </div>
+        <div className="form-group" style={{ minWidth: 200, marginBottom: 0 }}>
+          <label>Aula para chamada</label>
+          <select value={aulaSel || ''} onChange={e => {
+            const id = e.target.value
+            setAulaSel(id)
+            const inicial = {}
+            mats.forEach(m => {
+              const f = frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === id)
+              inicial[m.id] = f?.status || 'presente'
+            })
+            setChamada(inicial)
+          }}>
+            <option value="">— Ver diário completo —</option>
+            {aulasT.map(a => <option key={a.id} value={a.id}>Aula {a.numero} — {formatarData(a.data)}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* LEGENDA */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[
+          { st: 'presente', label: 'P — Presente', bg: '#d8f3dc', color: '#1b4332', border: '#40916c' },
+          { st: 'falta', label: 'F — Falta', bg: '#fee2e2', color: '#9b1c1c', border: '#f87171' },
+          { st: 'falta_justificada', label: 'FJ — Falta Justificada', bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+        ].map(l => (
+          <div key={l.st} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: l.bg, border: `2px solid ${l.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: l.color, fontSize: 11 }}>
+              {l.st === 'presente' ? 'P' : l.st === 'falta' ? 'F' : 'FJ'}
+            </div>
+            <span style={{ color: '#555' }}>{l.label}</span>
+          </div>
+        ))}
+        {aulaSel && <span style={{ fontSize: 11, color: '#999', alignSelf: 'center' }}>Clique na célula para alternar</span>}
       </div>
 
       {mats.length === 0 ? (
         <div className="empty-state"><div className="empty-state-icon">📋</div><h3>Nenhum aluno nesta turma</h3></div>
+      ) : aulaSel ? (
+        /* MODO CHAMADA — lista vertical fácil de clicar */
+        <div className="card">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {mats.map((m, idx) => {
+              const st = chamada[m.id] || 'presente'
+              const c = corCelula(st)
+              const faltas = contarFaltas(m.id)
+              return (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: 12, color: '#999', minWidth: 24, textAlign: 'right' }}>{idx + 1}</span>
+                  <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{m.aluno?.nome}</span>
+                  {faltas >= 3 && <span style={{ fontSize: 11, color: '#9b2226', fontWeight: 700 }}>⚠️ {faltas} faltas</span>}
+                  {/* Botões P / F / FJ */}
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[
+                      { s: 'presente', l: 'P', bg: '#d8f3dc', color: '#1b4332', border: '#40916c' },
+                      { s: 'falta', l: 'F', bg: '#fee2e2', color: '#9b1c1c', border: '#f87171' },
+                      { s: 'falta_justificada', l: 'FJ', bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+                    ].map(op => (
+                      <button
+                        key={op.s}
+                        onClick={() => setStatusDireto(m.id, op.s)}
+                        style={{
+                          width: op.l === 'FJ' ? 36 : 30, height: 30,
+                          borderRadius: 6,
+                          border: `2px solid ${st === op.s ? op.border : '#e2e8f0'}`,
+                          background: st === op.s ? op.bg : '#fff',
+                          color: st === op.s ? op.color : '#bbb',
+                          fontWeight: 800, fontSize: 11,
+                          cursor: 'pointer',
+                          transition: 'all 0.1s',
+                        }}
+                      >
+                        {op.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       ) : (
+        /* MODO DIÁRIO — tabela completa */
         <div className="card">
           <div className="table-wrap">
             <table>
@@ -544,7 +693,7 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
                 <tr>
                   <th>Aluno</th>
                   {aulasT.map(a => <th key={a.id} style={{ textAlign: 'center', minWidth: 44 }}>A{a.numero}</th>)}
-                  <th>Faltas</th>
+                  <th style={{ textAlign: 'center' }}>Faltas</th>
                   <th>Situação</th>
                 </tr>
               </thead>
@@ -557,12 +706,17 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
                       <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{m.aluno?.nome}</td>
                       {aulasT.map(a => {
                         const st = getStatus(m.id, a.id)
+                        const c = corCelula(st)
                         return (
-                          <td key={a.id} style={{ textAlign: 'center' }}>
-                            {st === 'presente' && <span title="Presente">✅</span>}
-                            {st === 'falta' && <span title="Falta">❌</span>}
-                            {st === 'falta_justificada' && <span title="Justificada">📝</span>}
-                            {!st && <span style={{ color: '#ccc' }}>—</span>}
+                          <td key={a.id} style={{ textAlign: 'center', padding: '6px 4px' }}>
+                            <div style={{
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              width: 28, height: 28, borderRadius: 6,
+                              background: c.bg, border: `2px solid ${c.border}`,
+                              color: c.color, fontWeight: 800, fontSize: 11,
+                            }}>
+                              {labelStatus(st)}
+                            </div>
                           </td>
                         )
                       })}
