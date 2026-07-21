@@ -6,6 +6,7 @@ const ABAS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'turmas', label: 'Turmas', icon: '🏫' },
   { id: 'alunos', label: 'Alunos', icon: '👥' },
+  { id: 'equipe', label: 'Equipe', icon: '👨‍🏫' },
   { id: 'frequencia', label: 'Frequência', icon: '📋' },
   { id: 'aulas', label: 'Aulas & Conteúdo', icon: '📚' },
   { id: 'relatorios', label: 'Relatórios', icon: '📈' },
@@ -73,6 +74,7 @@ export default function AreaCoordenador({ usuario, onLogout }) {
             {aba === 'dashboard' && <Dashboard turmas={turmas} alunos={alunos} matriculas={matriculas} frequencias={frequencias} />}
             {aba === 'turmas' && <GerenciarTurmas turmas={turmas} alunos={alunos} onAtualizar={carregar} setMsg={setMsg} />}
             {aba === 'alunos' && <GerenciarAlunos alunos={alunos} turmas={turmas} matriculas={matriculas} onAtualizar={carregar} setMsg={setMsg} />}
+            {aba === 'equipe' && <GerenciarEquipe onAtualizar={carregar} setMsg={setMsg} />}
             {aba === 'frequencia' && <VerFrequencia turmas={turmas} matriculas={matriculas} aulas={aulas} frequencias={frequencias} onAtualizar={carregar} />}
             {aba === 'aulas' && <GerenciarAulas turmas={turmas} aulas={aulas} onAtualizar={carregar} setMsg={setMsg} />}
             {aba === 'relatorios' && <Relatorios turmas={turmas} matriculas={matriculas} aulas={aulas} frequencias={frequencias} alunos={alunos} />}
@@ -679,4 +681,249 @@ function calcularReprovados(matriculas, frequencias) {
     const faltas = frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length
     return faltas >= 3
   }).length
+}
+
+// ── GERENCIAR EQUIPE (Professores e Coordenadores) ────────
+function GerenciarEquipe({ onAtualizar, setMsg }) {
+  const [equipe, setEquipe] = useState([])
+  const [showForm, setShowForm] = useState(false)
+  const [editando, setEditando] = useState(null)
+  const [form, setForm] = useState(formVazio())
+  const [carregando, setCarregando] = useState(true)
+
+  function formVazio() {
+    return { nome: '', matricula: '', email: '', senha_hash: '', perfil: 'professor' }
+  }
+
+  useEffect(() => { carregarEquipe() }, [])
+
+  async function carregarEquipe() {
+    setCarregando(true)
+    const { data } = await supabase
+      .from('usuarios')
+      .select('*')
+      .in('perfil', ['professor', 'coordenador'])
+      .eq('ativo', true)
+      .order('perfil')
+    setEquipe(data || [])
+    setCarregando(false)
+  }
+
+  async function salvar() {
+    if (!form.nome || !form.matricula || !form.senha_hash) return
+    if (editando) {
+      await supabase.from('usuarios').update({
+        nome: form.nome,
+        matricula: form.matricula.toUpperCase(),
+        email: form.email,
+        senha_hash: form.senha_hash,
+        perfil: form.perfil,
+      }).eq('id', editando)
+    } else {
+      await supabase.from('usuarios').insert({
+        ...form,
+        matricula: form.matricula.toUpperCase(),
+        ativo: true,
+      })
+    }
+    setShowForm(false)
+    setEditando(null)
+    setForm(formVazio())
+    carregarEquipe()
+    onAtualizar()
+    setMsg('Membro da equipe salvo!')
+    setTimeout(() => setMsg(''), 3000)
+  }
+
+  async function alterarSenha(id, novaSenha) {
+    if (!novaSenha) return
+    await supabase.from('usuarios').update({ senha_hash: novaSenha }).eq('id', id)
+    setMsg('Senha alterada com sucesso!')
+    setTimeout(() => setMsg(''), 3000)
+  }
+
+  async function desativar(id) {
+    if (!window.confirm('Desativar este membro da equipe?')) return
+    await supabase.from('usuarios').update({ ativo: false }).eq('id', id)
+    carregarEquipe()
+    onAtualizar()
+  }
+
+  const professores = equipe.filter(e => e.perfil === 'professor')
+  const coordenadores = equipe.filter(e => e.perfil === 'coordenador')
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title" style={{ color: '#1b4332' }}>EQUIPE</h1>
+          <p className="page-subtitle">Professores e coordenadores da Escola de Líderes</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditando(null); setForm(formVazio()) }}>
+          + Novo Membro
+        </button>
+      </div>
+
+      {/* MODAL FORM */}
+      {showForm && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3 className="modal-title">{editando ? 'Editar Membro' : 'Novo Membro da Equipe'}</h3>
+              <button className="modal-close" onClick={() => setShowForm(false)}>✕</button>
+            </div>
+
+            <div className="form-group">
+              <label>Perfil</label>
+              <select value={form.perfil} onChange={e => setForm({ ...form, perfil: e.target.value })}>
+                <option value="professor">Professor</option>
+                <option value="coordenador">Coordenador</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Nome completo</label>
+              <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome do professor ou coordenador" />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Matrícula / Login</label>
+                <input
+                  value={form.matricula}
+                  onChange={e => setForm({ ...form, matricula: e.target.value.toUpperCase() })}
+                  placeholder="Ex: PROF001"
+                />
+              </div>
+              <div className="form-group">
+                <label>Senha</label>
+                <input
+                  type="password"
+                  value={form.senha_hash}
+                  onChange={e => setForm({ ...form, senha_hash: e.target.value })}
+                  placeholder="Senha de acesso"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>E-mail (opcional)</label>
+              <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" />
+            </div>
+
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e', marginBottom: 16 }}>
+              💡 A matrícula é o que o professor usa para entrar no sistema. A senha pode ser trocada depois.
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={salvar}
+                disabled={!form.nome || !form.matricula || !form.senha_hash}
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* COORDENADORES */}
+      {coordenadores.length > 0 && (
+        <div className="card" style={{ marginBottom: 20, borderTop: '4px solid #1b4332' }}>
+          <div className="card-title" style={{ color: '#1b4332' }}>👑 Coordenadores</div>
+          <table>
+            <thead>
+              <tr><th>Nome</th><th>Matrícula</th><th>E-mail</th><th>Ações</th></tr>
+            </thead>
+            <tbody>
+              {coordenadores.map(m => (
+                <MembroRow key={m.id} membro={m}
+                  onEditar={() => { setEditando(m.id); setForm({ nome: m.nome, matricula: m.matricula, email: m.email || '', senha_hash: '', perfil: m.perfil }); setShowForm(true) }}
+                  onSenha={alterarSenha}
+                  onDesativar={desativar}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* PROFESSORES */}
+      <div className="card" style={{ borderTop: '4px solid #2d6a4f' }}>
+        <div className="card-title" style={{ color: '#2d6a4f' }}>👨‍🏫 Professores</div>
+        {carregando ? (
+          <p style={{ color: '#718096', fontSize: 13, textAlign: 'center', padding: 20 }}>Carregando...</p>
+        ) : professores.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">👨‍🏫</div>
+            <h3>Nenhum professor cadastrado</h3>
+            <p>Clique em "+ Novo Membro" para adicionar um professor</p>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr><th>Nome</th><th>Matrícula</th><th>E-mail</th><th>Ações</th></tr>
+            </thead>
+            <tbody>
+              {professores.map(m => (
+                <MembroRow key={m.id} membro={m}
+                  onEditar={() => { setEditando(m.id); setForm({ nome: m.nome, matricula: m.matricula, email: m.email || '', senha_hash: '', perfil: m.perfil }); setShowForm(true) }}
+                  onSenha={alterarSenha}
+                  onDesativar={desativar}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ── ROW DE MEMBRO COM TROCA DE SENHA ─────────────────────
+function MembroRow({ membro, onEditar, onSenha, onDesativar }) {
+  const [trocandoSenha, setTrocandoSenha] = useState(false)
+  const [novaSenha, setNovaSenha] = useState('')
+
+  return (
+    <tr>
+      <td style={{ fontWeight: 600 }}>{membro.nome}</td>
+      <td><span style={{ fontFamily: 'monospace', background: '#f8fafc', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>{membro.matricula}</span></td>
+      <td style={{ color: '#718096', fontSize: 12 }}>{membro.email || '—'}</td>
+      <td>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn btn-secondary btn-sm" onClick={onEditar}>✏️ Editar</button>
+          <button
+            className="btn btn-sm"
+            style={{ background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}
+            onClick={() => setTrocandoSenha(!trocandoSenha)}
+          >
+            🔑 Senha
+          </button>
+          <button className="btn btn-danger btn-sm" onClick={() => onDesativar(membro.id)}>Desativar</button>
+        </div>
+        {trocandoSenha && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <input
+              type="password"
+              placeholder="Nova senha..."
+              value={novaSenha}
+              onChange={e => setNovaSenha(e.target.value)}
+              style={{ flex: 1, padding: '6px 10px', border: '1.5px solid #e2e8f0', borderRadius: 6, fontSize: 12 }}
+            />
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => { onSenha(membro.id, novaSenha); setNovaSenha(''); setTrocandoSenha(false) }}
+              disabled={!novaSenha}
+            >
+              Salvar
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setTrocandoSenha(false)}>✕</button>
+          </div>
+        )}
+      </td>
+    </tr>
+  )
 }
