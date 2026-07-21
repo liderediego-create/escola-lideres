@@ -384,6 +384,21 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
     onAtualizar()
   }
 
+  async function excluirAluno(alunoId, nome) {
+    if (!window.confirm(`Excluir o aluno "${nome}"? Esta ação não pode ser desfeita.`)) return
+    await supabase.from('frequencias').delete().in('matricula_id',
+      (await supabase.from('matriculas').select('id').eq('aluno_id', alunoId)).data?.map(m => m.id) || []
+    )
+    await supabase.from('respostas').delete().in('matricula_id',
+      (await supabase.from('matriculas').select('id').eq('aluno_id', alunoId)).data?.map(m => m.id) || []
+    )
+    await supabase.from('matriculas').delete().eq('aluno_id', alunoId)
+    await supabase.from('usuarios').delete().eq('id', alunoId)
+    onAtualizar()
+    setMsg('Aluno excluído.')
+    setTimeout(() => setMsg(''), 3000)
+  }
+
   return (
     <>
       <div className="page-header">
@@ -455,6 +470,7 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
                         {mat && mat.status === 'ativo' && (
                           <button className="btn btn-sm" style={{ background: '#d8f3dc', color: '#1b4332', border: '1px solid #b7e4c7' }} onClick={() => promoverAluno(mat.id, 'aprovado')}>✓ Aprovar</button>
                         )}
+                        <button className="btn btn-danger btn-sm" onClick={() => excluirAluno(a.id, a.nome)}>🗑️ Excluir</button>
                       </div>
                     </td>
                   </tr>
