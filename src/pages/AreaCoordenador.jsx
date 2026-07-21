@@ -346,6 +346,15 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
       if (editando) {
         const { error } = await supabase.from('usuarios').update({ nome: form.nome, email: form.email }).eq('id', editando)
         if (error) { alert('Erro ao editar: ' + error.message); return }
+        // Atualiza turma se selecionada
+        if (turmaSelecionada) {
+          const matExist = matriculas.find(m => m.aluno_id === editando)
+          if (matExist) {
+            await supabase.from('matriculas').update({ turma_id: turmaSelecionada }).eq('id', matExist.id)
+          } else {
+            await supabase.from('matriculas').insert({ aluno_id: editando, turma_id: turmaSelecionada, status: 'ativo' })
+          }
+        }
       } else {
         // Gera matrícula única
         const { data: todos } = await supabase.from('usuarios').select('matricula, perfil')
@@ -427,6 +436,12 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
                 <input value={form.senha_hash} onChange={e => setForm({ ...form, senha_hash: e.target.value })} placeholder="Padrão: matrícula gerada automaticamente" />
               </div>
             )}
+            <div className="form-group"><label>Turma</label>
+              <select value={turmaSelecionada} onChange={e => setTurmaSelecionada(e.target.value)}>
+                <option value="">{editando ? 'Manter turma atual' : 'Selecione uma turma...'}</option>
+                {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
+              </select>
+            </div>
             <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#166534', marginBottom: 8 }}>
               {editando ? '✏️ A matrícula não pode ser alterada.' : '✅ Matrícula gerada automaticamente. Ex: A001, A002...'}
             </div>
