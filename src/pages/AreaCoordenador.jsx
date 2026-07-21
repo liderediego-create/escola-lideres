@@ -29,7 +29,7 @@ export default function AreaCoordenador({ usuario, onLogout }) {
     const [t, u, m, a, f] = await Promise.all([
       supabase.from('turmas').select('*, professor:professor_id(nome)').eq('ativa', true).order('modulo'),
       supabase.from('usuarios').select('*').eq('ativo', true).order('nome'),
-      supabase.from('matriculas').select('*, aluno:aluno_id(nome, matricula), turma:turma_id(nome, modulo)'),
+      supabase.from('matriculas').select('*, aluno:aluno_id(nome, matricula, equipe), turma:turma_id(nome, modulo, professor:professor_id(nome))'),
       supabase.from('aulas').select('*').order('numero'),
       supabase.from('frequencias').select('*'),
     ])
