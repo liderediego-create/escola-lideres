@@ -342,27 +342,41 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
 
   async function salvar() {
     if (!form.nome) return
-    if (editando) {
-      await supabase.from('usuarios').update({ nome: form.nome, email: form.email }).eq('id', editando)
-    } else {
-      const { data: todos } = await supabase.from('usuarios').select('matricula, perfil')
-      const matricula = gerarMatriculaAluno(todos || [])
-      const { data: novoAluno } = await supabase.from('usuarios').insert({
-        nome: form.nome,
-        email: form.email,
-        senha_hash: form.senha_hash || matricula,
-        perfil: 'aluno',
-        matricula,
-        ativo: true,
-      }).select().single()
-      if (novoAluno && turmaSelecionada) {
-        await supabase.from('matriculas').insert({ aluno_id: novoAluno.id, turma_id: turmaSelecionada, status: 'ativo' })
+    try {
+      if (editando) {
+        const { error } = await supabase.from('usuarios').update({ nome: form.nome, email: form.email }).eq('id', editando)
+        if (error) { alert('Erro ao editar: ' + error.message); return }
+      } else {
+        // Gera matrícula única
+        const { data: todos } = await supabase.from('usuarios').select('matricula, perfil')
+        const matricula = gerarMatriculaAluno(todos || [])
+        const senha = form.senha_hash || matricula
+
+        const { data: novoAluno, error: errInsert } = await supabase
+          .from('usuarios')
+          .insert({ nome: form.nome, email: form.email || null, senha_hash: senha, perfil: 'aluno', matricula, ativo: true })
+          .select()
+          .single()
+
+        if (errInsert) { alert('Erro ao cadastrar aluno: ' + errInsert.message); return }
+
+        if (novoAluno && turmaSelecionada) {
+          const { error: errMat } = await supabase
+            .from('matriculas')
+            .insert({ aluno_id: novoAluno.id, turma_id: turmaSelecionada, status: 'ativo' })
+          if (errMat) { alert('Aluno cadastrado mas erro na matrícula: ' + errMat.message) }
+        }
       }
+      setShowForm(false)
+      setEditando(null)
+      setForm(formVazio())
+      setTurmaSelecionada('')
+      onAtualizar()
+      setMsg('Aluno salvo!')
+      setTimeout(() => setMsg(''), 3000)
+    } catch (e) {
+      alert('Erro inesperado: ' + e.message)
     }
-    setShowForm(false); setEditando(null); setForm(formVazio()); setTurmaSelecionada('')
-    onAtualizar()
-    setMsg('Aluno salvo!')
-    setTimeout(() => setMsg(''), 3000)
   }
 
   async function promoverAluno(matriculaId, novoStatus) {
