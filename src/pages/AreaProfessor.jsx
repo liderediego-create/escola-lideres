@@ -21,11 +21,11 @@ export default function AreaProfessor({ usuario, onLogout }) {
     if (t) {
       setTurma(t)
       const [m, a, f] = await Promise.all([
-        supabase.from('matriculas').select('*, aluno:aluno_id(id, nome, matricula)').eq('turma_id', t.id),
+        supabase.from('matriculas').select('*, aluno:aluno_id(id, nome, matricula, equipe)').eq('turma_id', t.id),
         supabase.from('aulas').select('*').eq('turma_id', t.id).order('numero'),
         supabase.from('frequencias').select('*'),
       ])
-      setMatriculas(m.data || [])
+      setMatriculas((m.data || []).sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR')))
       setAulas(a.data || [])
       setFrequencias(f.data || [])
     }
@@ -198,7 +198,10 @@ function FazerChamada({ turma, matriculas, aulas, frequencias, usuario, aulaAtua
               return (
                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 160 }}>
-                    <p style={{ fontWeight: 600, fontSize: 14 }}>{m.aluno?.nome}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <p style={{ fontWeight: 600, fontSize: 14 }}>{m.aluno?.nome}</p>
+                      {m.aluno?.equipe && <span style={{ fontSize: 10, fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>{m.aluno.equipe}</span>}
+                    </div>
                     <p style={{ fontSize: 11, color: '#718096' }}>{m.aluno?.matricula} · {faltas} falta{faltas !== 1 ? 's' : ''}{faltas >= 3 ? ' ⚠️' : ''}</p>
                   </div>
 
@@ -285,7 +288,10 @@ function DiarioCompleto({ turma, matriculas, aulas, frequencias, cor }) {
                 const faltas = frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length
                 return (
                   <tr key={m.id}>
-                    <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{m.aluno?.nome}</td>
+                    <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        {m.aluno?.nome}
+                        {m.aluno?.equipe && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>{m.aluno.equipe}</span>}
+                      </td>
                     {aulas.map(a => {
                       const st = getStatus(m.id, a.id)
                       const cMap = {
@@ -346,7 +352,10 @@ function SituacaoAlunos({ matriculas, frequencias, aulas, cor }) {
 
           return (
             <div key={m.id} className="card" style={{ borderLeft: `4px solid ${reprovado ? '#9b2226' : risco ? '#d97706' : cor.primary}` }}>
-              <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{m.aluno?.nome}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <p style={{ fontWeight: 700, fontSize: 15 }}>{m.aluno?.nome}</p>
+                {m.aluno?.equipe && <span style={{ fontSize: 10, fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '1px 7px', borderRadius: 8 }}>{m.aluno.equipe}</span>}
+              </div>
               <p style={{ fontSize: 11, color: '#718096', marginBottom: 12 }}>{m.aluno?.matricula}</p>
 
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
