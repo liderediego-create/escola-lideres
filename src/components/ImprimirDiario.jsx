@@ -17,6 +17,7 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
 
   function gerarHTML() {
     const aulasOrdenadas = [...aulas].sort((a, b) => a.numero - b.numero)
+    const matriculasOrdenadas = [...matriculas].sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'))
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -54,7 +55,7 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
 
   /* INFO TURMA */
   .turma-info {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 8px; margin-bottom: 16px;
   }
   .info-box {
@@ -100,10 +101,28 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
   tbody tr:nth-child(even) { background: #fafafa; }
   tbody tr:last-child td { border-bottom: 2px solid ${cor.primary}; }
 
-  /* Marcações */
-  .presente { color: #1b4332; font-weight: 700; font-size: 13px; }
-  .falta { color: #9b1c1c; font-weight: 700; font-size: 13px; }
-  .justificada { color: #92400e; font-weight: 700; font-size: 13px; }
+  /* Marcações com fundo colorido */
+  .cel-presente {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 22px; border-radius: 5px;
+    background: #d8f3dc !important; color: #1b4332 !important;
+    border: 1.5px solid #40916c; font-weight: 800; font-size: 10px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .cel-falta {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 22px; border-radius: 5px;
+    background: #fee2e2 !important; color: #9b1c1c !important;
+    border: 1.5px solid #f87171; font-weight: 800; font-size: 10px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .cel-justificada {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 22px; border-radius: 5px;
+    background: #fef3c7 !important; color: #92400e !important;
+    border: 1.5px solid #fcd34d; font-weight: 800; font-size: 10px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
   .sem-reg { color: #ccc; }
 
   /* Coluna de faltas */
@@ -169,6 +188,10 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
       <span>${turma.nome}</span>
     </div>
     <div class="info-box">
+      <label>Professor(a)</label>
+      <span>${turma.professor?.nome || '—'}</span>
+    </div>
+    <div class="info-box">
       <label>Início das Aulas</label>
       <span>${formatarData(turma.data_inicio)}</span>
     </div>
@@ -180,9 +203,9 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
 
   <!-- LEGENDA -->
   <div class="legenda">
-    <div class="legenda-item"><span class="presente">P</span> = Presente</div>
-    <div class="legenda-item"><span class="falta">F</span> = Falta</div>
-    <div class="legenda-item"><span class="justificada">J</span> = Justificada</div>
+    <div class="legenda-item"><span class="cel-presente">P</span> = Presente</div>
+    <div class="legenda-item"><span class="cel-falta">F</span> = Falta</div>
+    <div class="legenda-item"><span class="cel-justificada">FJ</span> = Justificada</div>
     <div class="legenda-item">— = Sem registro</div>
     <div style="margin-left:auto;color:#9b1c1c;font-weight:700;">⚠️ Reprovação: 4 ou mais faltas (F)</div>
   </div>
@@ -205,20 +228,23 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
       </tr>
     </thead>
     <tbody>
-      ${matriculas.map(m => {
+      ${matriculasOrdenadas.map(m => {
         const faltas = getStatus ? aulas.filter(a => getStatus(m.id, a.id) === 'falta').length : 0
         const reprovado = faltas >= 4
         return `
         <tr>
           <td>
             <div style="font-weight:700;">${m.aluno?.nome || '—'}</div>
-            <div style="font-size:9px;color:#888;font-family:monospace;">${m.aluno?.matricula || ''}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+              <span style="font-size:9px;color:#888;font-family:monospace;">${m.aluno?.matricula || ''}</span>
+              ${m.aluno?.equipe ? `<span style="font-size:8px;font-weight:700;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:8px;letter-spacing:0.3px;">${m.aluno.equipe}</span>` : ''}
+            </div>
           </td>
           ${aulasOrdenadas.map(a => {
             const st = frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id)?.status
-            if (st === 'presente') return `<td><span class="presente">P</span></td>`
-            if (st === 'falta') return `<td><span class="falta">F</span></td>`
-            if (st === 'falta_justificada') return `<td><span class="justificada">J</span></td>`
+            if (st === 'presente') return `<td><span class="cel-presente">P</span></td>`
+            if (st === 'falta') return `<td><span class="cel-falta">F</span></td>`
+            if (st === 'falta_justificada') return `<td><span class="cel-justificada">FJ</span></td>`
             return `<td><span class="sem-reg">—</span></td>`
           }).join('')}
           <td class="faltas-col ${faltas >= 4 ? 'faltas-reprovado' : faltas >= 3 ? 'faltas-risco' : 'faltas-ok'}">${faltas}</td>
