@@ -328,16 +328,33 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
   const [turmaSelecionada, setTurmaSelecionada] = useState('')
 
   function formVazio() {
-    return { nome: '', matricula: '', email: '', senha_hash: '', perfil: 'aluno' }
+    return { nome: '', email: '', senha_hash: '', perfil: 'aluno' }
+  }
+
+  function gerarMatriculaAluno(lista) {
+    const alunos = lista.filter(u => u.perfil === 'aluno')
+    const numeros = alunos
+      .map(u => parseInt((u.matricula || '').replace('A', '')) || 0)
+      .filter(n => !isNaN(n))
+    const proximo = numeros.length > 0 ? Math.max(...numeros) + 1 : 1
+    return `A${String(proximo).padStart(3, '0')}`
   }
 
   async function salvar() {
-    if (!form.nome || !form.matricula) return
+    if (!form.nome) return
     if (editando) {
-      await supabase.from('usuarios').update(form).eq('id', editando)
+      await supabase.from('usuarios').update({ nome: form.nome, email: form.email }).eq('id', editando)
     } else {
-      const { data: novoAluno } = await supabase.from('usuarios').insert({ ...form, perfil: 'aluno', ativo: true }).select().single()
-      // Matricular na turma selecionada
+      const { data: todos } = await supabase.from('usuarios').select('matricula, perfil')
+      const matricula = gerarMatriculaAluno(todos || [])
+      const { data: novoAluno } = await supabase.from('usuarios').insert({
+        nome: form.nome,
+        email: form.email,
+        senha_hash: form.senha_hash || matricula,
+        perfil: 'aluno',
+        matricula,
+        ativo: true,
+      }).select().single()
       if (novoAluno && turmaSelecionada) {
         await supabase.from('matriculas').insert({ aluno_id: novoAluno.id, turma_id: turmaSelecionada, status: 'ativo' })
       }
@@ -371,18 +388,18 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
               <button className="modal-close" onClick={() => setShowForm(false)}>✕</button>
             </div>
             <div className="form-group"><label>Nome completo</label>
-              <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
-            </div>
-            <div className="form-row">
-              <div className="form-group"><label>Matrícula</label>
-                <input value={form.matricula} onChange={e => setForm({ ...form, matricula: e.target.value.toUpperCase() })} placeholder="Ex: M001" />
-              </div>
-              <div className="form-group"><label>Senha (opcional)</label>
-                <input value={form.senha_hash} onChange={e => setForm({ ...form, senha_hash: e.target.value })} placeholder="Padrão: matrícula" />
-              </div>
+              <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome do aluno" />
             </div>
             <div className="form-group"><label>E-mail (opcional)</label>
               <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            </div>
+            {!editando && (
+              <div className="form-group"><label>Senha (opcional)</label>
+                <input value={form.senha_hash} onChange={e => setForm({ ...form, senha_hash: e.target.value })} placeholder="Padrão: matrícula gerada automaticamente" />
+              </div>
+            )}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#166534', marginBottom: 8 }}>
+              {editando ? '✏️ A matrícula não pode ser alterada.' : '✅ Matrícula gerada automaticamente. Ex: A001, A002...'}
             </div>
             {!editando && (
               <div className="form-group"><label>Matricular na Turma</label>
@@ -394,7 +411,7 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
             )}
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={salvar}>Salvar</button>
+              <button className="btn btn-primary" onClick={salvar} disabled={!form.nome}>Salvar</button>
             </div>
           </div>
         </div>
