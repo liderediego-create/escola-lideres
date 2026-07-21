@@ -508,11 +508,10 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
   const [msg, setMsg] = useState('')
 
   const mats = matriculas.filter(m => m.turma_id === turmaSel)
+    .sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'))
   const aulasT = aulas.filter(a => a.turma_id === turmaSel).sort((a, b) => a.numero - b.numero)
   const turmaAtual = turmas.find(t => t.id === turmaSel)
   const cor = turmaAtual ? COR_MODULO[turmaAtual.modulo] : COR_MODULO[1]
-
-  // Quando muda a aula, carrega frequências existentes — tratado inline no onChange
 
   function getStatus(matriculaId, aulaId) {
     return frequencias.find(f => f.matricula_id === matriculaId && f.aula_id === aulaId)?.status || null
