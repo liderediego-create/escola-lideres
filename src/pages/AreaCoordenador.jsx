@@ -692,7 +692,7 @@ function GerenciarEquipe({ onAtualizar, setMsg }) {
   const [carregando, setCarregando] = useState(true)
 
   function formVazio() {
-    return { nome: '', matricula: '', email: '', senha_hash: '', perfil: 'professor' }
+    return { nome: '', email: '', senha_hash: '', perfil: 'professor' }
   }
 
   useEffect(() => { carregarEquipe() }, [])
@@ -709,22 +709,37 @@ function GerenciarEquipe({ onAtualizar, setMsg }) {
     setCarregando(false)
   }
 
+  function gerarMatricula(perfil, lista) {
+    const prefixo = perfil === 'coordenador' ? 'COORD' : 'PROF'
+    const doTipo = lista.filter(u => u.perfil === perfil)
+    const numeros = doTipo
+      .map(u => parseInt((u.matricula || '').replace(prefixo, '')) || 0)
+      .filter(n => !isNaN(n))
+    const proximo = numeros.length > 0 ? Math.max(...numeros) + 1 : 1
+    return `${prefixo}${String(proximo).padStart(3, '0')}`
+  }
+
   async function salvar() {
-    if (!form.nome || !form.matricula) return
+    if (!form.nome) return
     if (!editando && !form.senha_hash) return
     if (editando) {
       const dados = {
         nome: form.nome,
-        matricula: form.matricula.toUpperCase(),
         email: form.email,
         perfil: form.perfil,
       }
       if (form.senha_hash) dados.senha_hash = form.senha_hash
       await supabase.from('usuarios').update(dados).eq('id', editando)
     } else {
+      // Busca todos para gerar matrícula única
+      const { data: todos } = await supabase.from('usuarios').select('matricula, perfil')
+      const matricula = gerarMatricula(form.perfil, todos || [])
       await supabase.from('usuarios').insert({
-        ...form,
-        matricula: form.matricula.toUpperCase(),
+        nome: form.nome,
+        email: form.email,
+        senha_hash: form.senha_hash,
+        perfil: form.perfil,
+        matricula,
         ativo: true,
       })
     }
@@ -788,33 +803,27 @@ function GerenciarEquipe({ onAtualizar, setMsg }) {
               <input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome do professor ou coordenador" />
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>Matrícula / Login</label>
-                <input
-                  value={form.matricula}
-                  onChange={e => setForm({ ...form, matricula: e.target.value.toUpperCase() })}
-                  placeholder="Ex: PROF001"
-                />
-              </div>
-              <div className="form-group">
-                <label>Senha</label>
-                <input
-                  type="password"
-                  value={form.senha_hash}
-                  onChange={e => setForm({ ...form, senha_hash: e.target.value })}
-                  placeholder="Senha de acesso"
-                />
-              </div>
-            </div>
-
             <div className="form-group">
               <label>E-mail (opcional)</label>
               <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@exemplo.com" />
             </div>
 
-            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#92400e', marginBottom: 16 }}>
-              💡 A matrícula é o que o professor usa para entrar no sistema. A senha pode ser trocada depois.
+            {!editando && (
+              <div className="form-group">
+                <label>Senha de acesso</label>
+                <input
+                  type="password"
+                  value={form.senha_hash}
+                  onChange={e => setForm({ ...form, senha_hash: e.target.value })}
+                  placeholder="Senha inicial de acesso"
+                />
+              </div>
+            )}
+
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#166534', marginBottom: 16 }}>
+              {editando
+                ? '✏️ A matrícula é gerada automaticamente e não pode ser alterada. Use o botão "Senha" para trocar a senha.'
+                : '✅ A matrícula será gerada automaticamente. Ex: PROF001, PROF002, COORD001...'}
             </div>
 
             <div className="modal-footer">
@@ -822,7 +831,7 @@ function GerenciarEquipe({ onAtualizar, setMsg }) {
               <button
                 className="btn btn-primary"
                 onClick={salvar}
-                disabled={!form.nome || !form.matricula || (!editando && !form.senha_hash)}
+                disabled={!form.nome || (!editando && !form.senha_hash)}
               >
                 Salvar
               </button>
