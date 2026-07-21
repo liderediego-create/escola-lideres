@@ -201,6 +201,26 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
     </div>
   </div>
 
+  <!-- RESUMO DE FREQUÊNCIA -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+    <div style="background:#d8f3dc;border:1.5px solid #40916c;border-radius:8px;padding:10px 14px;text-align:center;">
+      <div style="font-size:22px;font-weight:900;color:#1b4332;">${matriculasOrdenadas.reduce((t, m) => t + aulas.filter(a => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'presente')).length, 0)}</div>
+      <div style="font-size:10px;font-weight:700;color:#1b4332;text-transform:uppercase;letter-spacing:1px;">Presenças (P)</div>
+    </div>
+    <div style="background:#fee2e2;border:1.5px solid #f87171;border-radius:8px;padding:10px 14px;text-align:center;">
+      <div style="font-size:22px;font-weight:900;color:#9b1c1c;">${matriculasOrdenadas.reduce((t, m) => t + aulas.filter(a => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta')).length, 0)}</div>
+      <div style="font-size:10px;font-weight:700;color:#9b1c1c;text-transform:uppercase;letter-spacing:1px;">Faltas (F)</div>
+    </div>
+    <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:8px;padding:10px 14px;text-align:center;">
+      <div style="font-size:22px;font-weight:900;color:#92400e;">${matriculasOrdenadas.reduce((t, m) => t + aulas.filter(a => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta_justificada')).length, 0)}</div>
+      <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Justificadas (FJ)</div>
+    </div>
+    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 14px;text-align:center;">
+      <div style="font-size:22px;font-weight:900;color:#9b1c1c;">${matriculasOrdenadas.filter(m => frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length >= 4).length}</div>
+      <div style="font-size:10px;font-weight:700;color:#9b1c1c;text-transform:uppercase;letter-spacing:1px;">⚠️ Reprovados</div>
+    </div>
+  </div>
+
   <!-- LEGENDA -->
   <div class="legenda">
     <div class="legenda-item"><span class="cel-presente">P</span> = Presente</div>
