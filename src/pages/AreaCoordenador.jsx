@@ -344,7 +344,7 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
     if (!form.nome) return
     try {
       if (editando) {
-        const { error } = await supabase.from('usuarios').update({ nome: form.nome, email: form.email || null }).eq('id', editando)
+        const { error } = await supabase.from('usuarios').update({ nome: form.nome, email: form.email || null, equipe: form.equipe || null }).eq('id', editando)
         if (error) { alert('Erro ao editar: ' + error.message); return }
         // Atualiza turma se selecionada
         if (turmaSelecionada) {
@@ -363,7 +363,7 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
 
         const { data: novoAluno, error: errInsert } = await supabase
           .from('usuarios')
-          .insert({ nome: form.nome, email: form.email || null, senha_hash: senha, perfil: 'aluno', matricula, ativo: true })
+          .insert({ nome: form.nome, email: form.email || null, senha_hash: senha, perfil: 'aluno', matricula, ativo: true, equipe: form.equipe || null })
           .select()
           .single()
 
@@ -431,6 +431,15 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
             <div className="form-group"><label>E-mail (opcional)</label>
               <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
             </div>
+            <div className="form-group"><label>Equipe</label>
+              <select value={form.equipe || ''} onChange={e => setForm({ ...form, equipe: e.target.value })}>
+                <option value="">Sem equipe</option>
+                <option value="Valentes">Valentes</option>
+                <option value="Enoque">Enoque</option>
+                <option value="Inábaláveis">Inábaláveis</option>
+                <option value="Eleitos">Eleitos</option>
+              </select>
+            </div>
             {!editando && (
               <div className="form-group"><label>Senha (opcional)</label>
                 <input value={form.senha_hash} onChange={e => setForm({ ...form, senha_hash: e.target.value })} placeholder="Padrão: matrícula gerada automaticamente" />
@@ -477,6 +486,7 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
                   <tr key={a.id}>
                     <td><span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{a.matricula}</span></td>
                     <td style={{ fontWeight: 600 }}>{a.nome}</td>
+                    <td>{a.equipe ? <span className="badge badge-azul">{a.equipe}</span> : <span style={{ color: '#ccc' }}>—</span>}</td>
                     <td>{mat ? <span className="badge" style={{ background: cor.light, color: cor.text }}>Módulo {mat.turma?.modulo} — {mat.turma?.nome}</span> : <span style={{ color: '#999' }}>Sem turma</span>}</td>
                     <td>{mat ? <StatusBadge status={mat.status} /> : '—'}</td>
                     <td>
@@ -804,13 +814,12 @@ function GerenciarAulas({ turmas, aulas, onAtualizar, setMsg }) {
 }
 
 // ── RELATÓRIOS ────────────────────────────────────────────
-function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
-  const [turmaSel, setTurmaSel] = useState(turmas[0]?.id || '')
+const EQUIPES = ['Valentes', 'Enoque', 'Inábaláveis', 'Eleitos']
 
-  const mats = matriculas.filter(m => m.turma_id === turmaSel)
-  const aulasT = aulas.filter(a => a.turma_id === turmaSel)
-  const turma = turmas.find(t => t.id === turmaSel)
-  const cor = turma ? COR_MODULO[turma.modulo] : COR_MODULO[1]
+function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
+  const [modo, setModo] = useState('turma') // 'turma' ou 'equipe'
+  const [turmaSel, setTurmaSel] = useState(turmas[0]?.id || '')
+  const [equipeSel, setEquipeSel] = useState('Valentes')
 
   function getFaltas(matId) {
     return frequencias.filter(f => f.matricula_id === matId && f.status === 'falta').length
@@ -819,56 +828,204 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
     return frequencias.filter(f => f.matricula_id === matId && f.status === 'presente').length
   }
 
-  const reprovados = mats.filter(m => getFaltas(m.id) >= 4)
-  const aprovados = mats.filter(m => getFaltas(m.id) < 4 && m.status !== 'reprovado')
+  // ── MODO TURMA ──
+  const mats = matriculas.filter(m => m.turma_id === turmaSel)
+    .sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'))
+  const aulasT = aulas.filter(a => a.turma_id === turmaSel)
+  const turma = turmas.find(t => t.id === turmaSel)
+  const cor = turma ? COR_MODULO[turma.modulo] : COR_MODULO[1]
+
+  // ── MODO EQUIPE ──
+  const alunosEquipe = alunos
+    .filter(a => a.equipe === equipeSel)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  function getMatricula(alunoId) {
+    return matriculas.find(m => m.aluno_id === alunoId)
+  }
+  function getTurma(matId) {
+    const mat = matriculas.find(m => m.aluno_id === matId)
+    if (!mat) return null
+    return turmas.find(t => t.id === mat.turma_id)
+  }
+  function getFaltasAluno(alunoId) {
+    const mat = matriculas.find(m => m.aluno_id === alunoId)
+    if (!mat) return 0
+    return frequencias.filter(f => f.matricula_id === mat.id && f.status === 'falta').length
+  }
+  function getPresencasAluno(alunoId) {
+    const mat = matriculas.find(m => m.aluno_id === alunoId)
+    if (!mat) return 0
+    return frequencias.filter(f => f.matricula_id === mat.id && f.status === 'presente').length
+  }
+
+  function imprimirRelatorioEquipe() {
+    const linhas = alunosEquipe.map((a, i) => {
+      const t = getTurma(a.id)
+      const faltas = getFaltasAluno(a.id)
+      const presencas = getPresencasAluno(a.id)
+      const rep = faltas >= 4
+      const cor = t ? COR_MODULO[t.modulo] : COR_MODULO[1]
+      return `<tr>
+        <td>${i + 1}</td>
+        <td style="font-weight:700">${a.nome}</td>
+        <td style="font-family:monospace;font-size:11px">${a.matricula}</td>
+        <td>${t ? `<span style="background:${cor.light};color:${cor.text};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">Módulo ${t.modulo}</span>` : '—'}</td>
+        <td style="text-align:center;color:#2d6a4f;font-weight:700">${presencas}</td>
+        <td style="text-align:center;color:${faltas>=3?'#9b1c1c':'#495057'};font-weight:700">${faltas}</td>
+        <td>${rep ? '<span style="background:#fee2e2;color:#9b1c1c;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">⚠️ Reprovado</span>' : '<span style="background:#d8f3dc;color:#1b4332;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">✓ Regular</span>'}</td>
+      </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:Arial,sans-serif;font-size:12px;padding:20px}
+      h1{font-size:22px;color:#1b4332;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+      h2{font-size:14px;color:#555;font-weight:500;margin-bottom:16px}
+      .info{background:#f0fdf4;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;display:flex;gap:24px}
+      .info span{font-weight:700}
+      table{width:100%;border-collapse:collapse;margin-top:12px}
+      th{background:#1b4332;color:#fff;padding:8px 10px;text-align:left;font-size:11px;letter-spacing:0.5px}
+      td{padding:8px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+      tr:nth-child(even){background:#fafafa}
+      .rodape{margin-top:20px;text-align:center;font-size:9px;color:#888;border-top:1px solid #e2e8f0;padding-top:8px}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    </style></head><body>
+    <h1>Escola de Líderes — Equipe ${equipeSel}</h1>
+    <h2>Relatório de Frequência por Equipe</h2>
+    <div class="info">
+      <div>Total de alunos: <span>${alunosEquipe.length}</span></div>
+      <div>Regulares: <span style="color:#1b4332">${alunosEquipe.filter(a=>getFaltasAluno(a.id)<4).length}</span></div>
+      <div>Reprovados: <span style="color:#9b1c1c">${alunosEquipe.filter(a=>getFaltasAluno(a.id)>=4).length}</span></div>
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Aluno</th><th>Matrícula</th><th>Módulo</th><th style="text-align:center">Presenças</th><th style="text-align:center">Faltas</th><th>Situação</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+    <div class="rodape">Escola de Líderes — Comunidade Por Amor | Equipe ${equipeSel} | Impresso em ${new Date().toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'})}</div>
+    </body></html>`
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank')
+    if (win) { win.onload = () => { win.focus(); win.print() } }
+    setTimeout(() => URL.revokeObjectURL(url), 15000)
+  }
 
   return (
     <>
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ color: '#1b4332' }}>RELATÓRIOS</h1>
-          <p className="page-subtitle">Situação geral dos alunos</p>
+          <p className="page-subtitle">Visualize por turma ou por equipe</p>
         </div>
+        {modo === 'equipe' && (
+          <button className="btn btn-secondary" onClick={imprimirRelatorioEquipe}>🖨️ Imprimir Equipe</button>
+        )}
       </div>
 
-      <div className="form-group" style={{ maxWidth: 400, marginBottom: 24 }}>
-        <label>Selecionar Turma</label>
-        <select value={turmaSel} onChange={e => setTurmaSel(e.target.value)}>
-          {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
-        </select>
+      {/* TABS */}
+      <div className="tabs" style={{ marginBottom: 20 }}>
+        <button className={`tab ${modo === 'turma' ? 'ativo' : ''}`} onClick={() => setModo('turma')}>📚 Por Turma</button>
+        <button className={`tab ${modo === 'equipe' ? 'ativo' : ''}`} onClick={() => setModo('equipe')}>🏆 Por Equipe</button>
       </div>
 
-      <div className="cards-grid" style={{ marginBottom: 24 }}>
-        <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{mats.length}</div><div className="stat-label">Total de alunos</div></div>
-        <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{aprovados.length}</div><div className="stat-label">Regulares</div></div>
-        <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{reprovados.length}</div><div className="stat-label">Reprovados (≥4 faltas)</div></div>
-        <div className="stat-card"><div className="stat-icon">📚</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{aulasT.length}</div><div className="stat-label">Aulas registradas</div></div>
-      </div>
+      {modo === 'turma' ? (
+        <>
+          <div className="form-group" style={{ maxWidth: 400, marginBottom: 24 }}>
+            <label>Selecionar Turma</label>
+            <select value={turmaSel} onChange={e => setTurmaSel(e.target.value)}>
+              {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
+            </select>
+          </div>
 
-      <div className="card">
-        <div className="card-title" style={{ color: cor.primary }}>Situação Individual dos Alunos</div>
-        <table>
-          <thead>
-            <tr><th>Aluno</th><th>Matrícula</th><th>Presenças</th><th>Faltas</th><th>Situação</th></tr>
-          </thead>
-          <tbody>
-            {mats.map(m => {
-              const faltas = getFaltas(m.id)
-              const presencas = getPresencas(m.id)
-              const rep = faltas >= 4
-              return (
-                <tr key={m.id}>
-                  <td style={{ fontWeight: 600 }}>{m.aluno?.nome}</td>
-                  <td><span style={{ fontFamily: 'monospace' }}>{m.aluno?.matricula}</span></td>
-                  <td style={{ color: '#2d6a4f', fontWeight: 600 }}>{presencas}</td>
-                  <td style={{ color: faltas >= 3 ? '#9b2226' : '#666', fontWeight: 600 }}>{faltas}</td>
-                  <td>{rep ? <span className="badge badge-vermelho">⚠️ Reprovado</span> : <span className="badge badge-verde">✓ Regular</span>}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+          <div className="cards-grid" style={{ marginBottom: 24 }}>
+            <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{mats.length}</div><div className="stat-label">Total de alunos</div></div>
+            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{mats.filter(m => getFaltas(m.id) < 4).length}</div><div className="stat-label">Regulares</div></div>
+            <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{mats.filter(m => getFaltas(m.id) >= 4).length}</div><div className="stat-label">Reprovados</div></div>
+            <div className="stat-card"><div className="stat-icon">📚</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{aulasT.length}</div><div className="stat-label">Aulas registradas</div></div>
+          </div>
+
+          <div className="card">
+            <div className="card-title" style={{ color: cor.primary }}>Situação Individual</div>
+            <table>
+              <thead><tr><th>Aluno</th><th>Matrícula</th><th>Equipe</th><th>Presenças</th><th>Faltas</th><th>Situação</th></tr></thead>
+              <tbody>
+                {mats.map(m => {
+                  const faltas = getFaltas(m.id)
+                  const presencas = getPresencas(m.id)
+                  const rep = faltas >= 4
+                  return (
+                    <tr key={m.id}>
+                      <td style={{ fontWeight: 600 }}>{m.aluno?.nome}</td>
+                      <td><span style={{ fontFamily: 'monospace' }}>{m.aluno?.matricula}</span></td>
+                      <td>{m.aluno?.equipe ? <span className="badge badge-azul">{m.aluno.equipe}</span> : <span style={{ color: '#ccc' }}>—</span>}</td>
+                      <td style={{ color: '#2d6a4f', fontWeight: 600 }}>{presencas}</td>
+                      <td style={{ color: faltas >= 3 ? '#9b2226' : '#666', fontWeight: 600 }}>{faltas}</td>
+                      <td>{rep ? <span className="badge badge-vermelho">⚠️ Reprovado</span> : <span className="badge badge-verde">✓ Regular</span>}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* SELEÇÃO DE EQUIPE */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+            {EQUIPES.map(eq => (
+              <button key={eq} onClick={() => setEquipeSel(eq)}
+                className="btn"
+                style={{
+                  background: equipeSel === eq ? '#1b4332' : '#fff',
+                  color: equipeSel === eq ? '#fff' : '#1b4332',
+                  border: '2px solid #1b4332',
+                  fontWeight: 700, fontSize: 14, padding: '10px 24px',
+                }}>
+                {eq}
+              </button>
+            ))}
+          </div>
+
+          <div className="cards-grid" style={{ marginBottom: 24 }}>
+            <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{alunosEquipe.length}</div><div className="stat-label">Alunos na equipe</div></div>
+            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{alunosEquipe.filter(a => getFaltasAluno(a.id) < 4).length}</div><div className="stat-label">Regulares</div></div>
+            <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{alunosEquipe.filter(a => getFaltasAluno(a.id) >= 4).length}</div><div className="stat-label">Reprovados</div></div>
+          </div>
+
+          <div className="card">
+            <div className="card-title" style={{ color: '#1b4332' }}>Equipe {equipeSel} — Todos os Módulos</div>
+            {alunosEquipe.length === 0 ? (
+              <div className="empty-state"><div className="empty-state-icon">🏆</div><h3>Nenhum aluno nesta equipe</h3><p>Cadastre alunos e vincule à equipe {equipeSel}</p></div>
+            ) : (
+              <table>
+                <thead><tr><th>Aluno</th><th>Matrícula</th><th>Módulo</th><th>Presenças</th><th>Faltas</th><th>Situação</th></tr></thead>
+                <tbody>
+                  {alunosEquipe.map(a => {
+                    const t = getTurma(a.id)
+                    const faltas = getFaltasAluno(a.id)
+                    const presencas = getPresencasAluno(a.id)
+                    const rep = faltas >= 4
+                    const corT = t ? COR_MODULO[t.modulo] : COR_MODULO[1]
+                    return (
+                      <tr key={a.id}>
+                        <td style={{ fontWeight: 600 }}>{a.nome}</td>
+                        <td><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{a.matricula}</span></td>
+                        <td>{t ? <span className="badge" style={{ background: corT.light, color: corT.text }}>Módulo {t.modulo}</span> : <span style={{ color: '#999' }}>—</span>}</td>
+                        <td style={{ color: '#2d6a4f', fontWeight: 600 }}>{presencas}</td>
+                        <td style={{ color: faltas >= 3 ? '#9b2226' : '#666', fontWeight: 600 }}>{faltas}</td>
+                        <td>{rep ? <span className="badge badge-vermelho">⚠️ Reprovado</span> : <span className="badge badge-verde">✓ Regular</span>}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
     </>
   )
 }
