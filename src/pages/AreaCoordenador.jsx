@@ -942,9 +942,9 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
 
           <div className="cards-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{mats.length}</div><div className="stat-label">Total de alunos</div></div>
-            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{mats.filter(m => getFaltas(m.id) < 4).length}</div><div className="stat-label">Regulares</div></div>
+            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{mats.reduce((t, m) => t + getPresencas(m.id), 0)}</div><div className="stat-label">Total de Presenças</div></div>
+            <div className="stat-card"><div className="stat-icon">❌</div><div className="stat-valor" style={{ color: '#9b2226' }}>{mats.reduce((t, m) => t + getFaltas(m.id), 0)}</div><div className="stat-label">Total de Faltas</div></div>
             <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{mats.filter(m => getFaltas(m.id) >= 4).length}</div><div className="stat-label">Reprovados</div></div>
-            <div className="stat-card"><div className="stat-icon">📚</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{aulasT.length}</div><div className="stat-label">Aulas registradas</div></div>
           </div>
 
           <div className="card">
@@ -991,7 +991,8 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
 
           <div className="cards-grid" style={{ marginBottom: 24 }}>
             <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{alunosEquipe.length}</div><div className="stat-label">Alunos na equipe</div></div>
-            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{alunosEquipe.filter(a => getFaltasAluno(a.id) < 4).length}</div><div className="stat-label">Regulares</div></div>
+            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{alunosEquipe.reduce((t, a) => t + getPresencasAluno(a.id), 0)}</div><div className="stat-label">Total de Presenças</div></div>
+            <div className="stat-card"><div className="stat-icon">❌</div><div className="stat-valor" style={{ color: '#9b2226' }}>{alunosEquipe.reduce((t, a) => t + getFaltasAluno(a.id), 0)}</div><div className="stat-label">Total de Faltas</div></div>
             <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{alunosEquipe.filter(a => getFaltasAluno(a.id) >= 4).length}</div><div className="stat-label">Reprovados</div></div>
           </div>
 
