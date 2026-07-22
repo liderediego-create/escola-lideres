@@ -547,7 +547,8 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
     if (!aulaSel) return
     setSalvando(true)
     for (const m of mats) {
-      const status = chamada[m.id] || 'presente'
+      const status = chamada[m.id] || null
+      if (!status) continue
       const freqExist = frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaSel)
       if (freqExist) {
         await supabase.from('frequencias').update({ status }).eq('id', freqExist.id)
@@ -610,7 +611,7 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
             const inicial = {}
             mats.forEach(m => {
               const f = frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === id)
-              inicial[m.id] = f?.status || 'presente'
+              inicial[m.id] = f?.status || null
             })
             setChamada(inicial)
           }}>

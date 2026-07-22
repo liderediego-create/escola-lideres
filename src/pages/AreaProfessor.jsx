@@ -111,7 +111,7 @@ function FazerChamada({ turma, matriculas, aulas, frequencias, usuario, aulaAtua
     const just = {}
     matriculas.forEach(m => {
       const f = frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === aulaObj.id)
-      inicial[m.id] = f?.status || 'presente'
+      inicial[m.id] = f?.status || null
       just[m.id] = f?.justificativa || ''
     })
     setChamada(inicial)
@@ -126,7 +126,8 @@ function FazerChamada({ turma, matriculas, aulas, frequencias, usuario, aulaAtua
     if (!aulaObj) return
     setSalvando(true)
     for (const m of matriculas) {
-      const status = chamada[m.id] || 'presente'
+      const status = chamada[m.id] || null
+      if (!status) continue // pula se não marcado
       const justificativa = justificativas[m.id] || null
       const freqExist = frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaObj.id)
       if (freqExist) {
@@ -186,7 +187,7 @@ function FazerChamada({ turma, matriculas, aulas, frequencias, usuario, aulaAtua
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {matriculas.map((m, idx) => {
               const faltas = frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length
-              const st = chamada[m.id] || 'presente'
+              const st = chamada[m.id] || null
               return (
                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 12, color: '#aaa', minWidth: 24, textAlign: 'right' }}>{idx + 1}</span>
