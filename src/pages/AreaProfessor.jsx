@@ -505,14 +505,25 @@ function DiarioCompleto({ turma, matriculas, aulas, frequencias, cor }) {
 
 // ── RELATÓRIOS ────────────────────────────────────────────
 function Relatorios({ turma, matriculas, aulas, frequencias, cor }) {
+  const [aulaSel, setAulaSel] = useState(aulas[0]?.id || '')
+
+  const aulaObj = aulas.find(a => a.id === aulaSel)
+  const aulasOrdenadas = [...aulas].sort((a, b) => a.numero - b.numero)
+
+  // Stats por aula selecionada
+  function getFreqAula(matId) {
+    return frequencias.find(f => f.matricula_id === matId && f.aula_id === aulaSel)?.status || null
+  }
+
+  const presencasAula = matriculas.filter(m => getFreqAula(m.id) === 'presente').length
+  const faltasAula = matriculas.filter(m => getFreqAula(m.id) === 'falta').length
+  const justAula = matriculas.filter(m => getFreqAula(m.id) === 'falta_justificada').length
+  const semRegistro = matriculas.filter(m => !getFreqAula(m.id)).length
+
+  // Stats individuais acumulados
   function getFaltas(matId) { return frequencias.filter(f => f.matricula_id === matId && f.status === 'falta').length }
   function getPresencas(matId) { return frequencias.filter(f => f.matricula_id === matId && f.status === 'presente').length }
-  function getJustificadas(matId) { return frequencias.filter(f => f.matricula_id === matId && f.status === 'falta_justificada').length }
-
-  const totalPresencas = matriculas.reduce((t, m) => t + getPresencas(m.id), 0)
-  const totalFaltas = matriculas.reduce((t, m) => t + getFaltas(m.id), 0)
-  const totalJustificadas = matriculas.reduce((t, m) => t + getJustificadas(m.id), 0)
-  const reprovados = matriculas.filter(m => getFaltas(m.id) >= 4)
+  function getJust(matId) { return frequencias.filter(f => f.matricula_id === matId && f.status === 'falta_justificada').length }
 
   return (
     <>
@@ -523,33 +534,106 @@ function Relatorios({ turma, matriculas, aulas, frequencias, cor }) {
         </div>
       </div>
 
-      <div className="cards-grid" style={{ marginBottom: 24 }}>
-        <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{matriculas.length}</div><div className="stat-label">Total de alunos</div></div>
-        <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{totalPresencas}</div><div className="stat-label">Total de Presenças</div></div>
-        <div className="stat-card"><div className="stat-icon">❌</div><div className="stat-valor" style={{ color: '#9b2226' }}>{totalFaltas}</div><div className="stat-label">Total de Faltas</div></div>
-        <div className="stat-card"><div className="stat-icon">📝</div><div className="stat-valor" style={{ color: '#d97706' }}>{totalJustificadas}</div><div className="stat-label">Justificadas</div></div>
-        <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{reprovados.length}</div><div className="stat-label">Reprovados</div></div>
+      {/* SELETOR DE AULA */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-title" style={{ color: cor.primary }}>📅 Selecione a semana</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {aulasOrdenadas.map(a => (
+            <button key={a.id} onClick={() => setAulaSel(a.id)}
+              className="btn btn-sm"
+              style={{
+                background: aulaSel === a.id ? cor.primary : '#fff',
+                color: aulaSel === a.id ? '#fff' : cor.primary,
+                border: `2px solid ${cor.primary}`,
+                fontWeight: aulaSel === a.id ? 700 : 500,
+              }}>
+              Aula {a.numero}
+              {a.data && <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.8 }}>{new Date(a.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* CARDS DA SEMANA */}
+      {aulaObj && (
+        <div style={{ marginBottom: 24 }}>
+          <p style={{ fontSize: 13, color: '#718096', marginBottom: 12 }}>
+            <strong style={{ color: cor.primary }}>Aula {aulaObj.numero}</strong>
+            {aulaObj.titulo ? ` — ${aulaObj.titulo}` : ''} · {aulaObj.data ? new Date(aulaObj.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }) : ''}
+          </p>
+          <div className="cards-grid">
+            <div className="stat-card" style={{ borderTop: '3px solid #2d6a4f' }}>
+              <div style={{ fontSize: 28 }}>👥</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#1e40af' }}>{matriculas.length}</div>
+              <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Alunos na turma</div>
+            </div>
+            <div className="stat-card" style={{ borderTop: '3px solid #2d6a4f' }}>
+              <div style={{ fontSize: 28 }}>✅</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#2d6a4f' }}>{presencasAula}</div>
+              <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Presentes nesta aula</div>
+            </div>
+            <div className="stat-card" style={{ borderTop: '3px solid #9b2226' }}>
+              <div style={{ fontSize: 28 }}>❌</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#9b2226' }}>{faltasAula}</div>
+              <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Faltas nesta aula</div>
+            </div>
+            <div className="stat-card" style={{ borderTop: '3px solid #d97706' }}>
+              <div style={{ fontSize: 28 }}>📝</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#d97706' }}>{justAula}</div>
+              <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Justificadas</div>
+            </div>
+            <div className="stat-card" style={{ borderTop: '3px solid #999' }}>
+              <div style={{ fontSize: 28 }}>—</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#999' }}>{semRegistro}</div>
+              <div style={{ fontSize: 12, color: '#718096', marginTop: 4 }}>Sem registro</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TABELA INDIVIDUAL */}
       <div className="card">
-        <div className="card-title" style={{ color: cor.primary }}>Situação Individual dos Alunos</div>
+        <div className="card-title" style={{ color: cor.primary }}>Situação Individual — Acumulado</div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Aluno</th><th>Matrícula</th><th>Equipe</th><th style={{ textAlign: 'center' }}>Presenças</th><th style={{ textAlign: 'center' }}>Faltas</th><th style={{ textAlign: 'center' }}>Justificadas</th><th>Situação</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Aluno</th>
+                <th>Matrícula</th>
+                <th>Equipe</th>
+                <th style={{ textAlign: 'center' }}>Nesta Aula</th>
+                <th style={{ textAlign: 'center' }}>Presenças</th>
+                <th style={{ textAlign: 'center' }}>Faltas</th>
+                <th style={{ textAlign: 'center' }}>FJ</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
             <tbody>
               {matriculas.map(m => {
                 const faltas = getFaltas(m.id)
                 const presencas = getPresencas(m.id)
-                const justificadas = getJustificadas(m.id)
+                const just = getJust(m.id)
+                const freqAula = getFreqAula(m.id)
                 const rep = faltas >= 4
+                const cMap = {
+                  presente: { bg: '#d8f3dc', color: '#1b4332', border: '#40916c', l: 'P' },
+                  falta: { bg: '#fee2e2', color: '#9b1c1c', border: '#f87171', l: 'F' },
+                  falta_justificada: { bg: '#fef3c7', color: '#92400e', border: '#fcd34d', l: 'FJ' },
+                }
+                const c = cMap[freqAula]
                 return (
                   <tr key={m.id} style={{ background: rep ? '#fff5f5' : faltas >= 3 ? '#fffbeb' : 'transparent' }}>
                     <td style={{ fontWeight: 600 }}>{m.aluno?.nome}</td>
                     <td><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{m.aluno?.matricula}</span></td>
                     <td>{m.aluno?.equipe ? <span className="badge badge-azul">{m.aluno.equipe}</span> : <span style={{ color: '#ccc' }}>—</span>}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {c
+                        ? <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 6, background: c.bg, border: `2px solid ${c.border}`, color: c.color, fontWeight: 800, fontSize: 11 }}>{c.l}</div>
+                        : <span style={{ color: '#ccc' }}>—</span>}
+                    </td>
                     <td style={{ textAlign: 'center', color: '#2d6a4f', fontWeight: 700 }}>{presencas}</td>
                     <td style={{ textAlign: 'center', color: faltas >= 3 ? '#9b2226' : '#666', fontWeight: 700 }}>{faltas}</td>
-                    <td style={{ textAlign: 'center', color: '#d97706', fontWeight: 700 }}>{justificadas}</td>
+                    <td style={{ textAlign: 'center', color: '#d97706', fontWeight: 700 }}>{just}</td>
                     <td>{rep ? <span className="badge badge-vermelho">⚠️ Reprovado</span> : faltas >= 3 ? <span className="badge badge-amarelo">⚡ Atenção</span> : <span className="badge badge-verde">✓ Regular</span>}</td>
                   </tr>
                 )

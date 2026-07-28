@@ -821,6 +821,7 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
   const [modo, setModo] = useState('turma') // 'turma' ou 'equipe'
   const [turmaSel, setTurmaSel] = useState(turmas[0]?.id || '')
   const [equipeSel, setEquipeSel] = useState('Valentes')
+  const [aulaSel, setAulaSel] = useState('')
 
   function getFaltas(matId) {
     return frequencias.filter(f => f.matricula_id === matId && f.status === 'falta').length
@@ -934,19 +935,38 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
 
       {modo === 'turma' ? (
         <>
-          <div className="form-group" style={{ maxWidth: 400, marginBottom: 24 }}>
-            <label>Selecionar Turma</label>
-            <select value={turmaSel} onChange={e => setTurmaSel(e.target.value)}>
-              {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
-            </select>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+            <div className="form-group" style={{ minWidth: 280, marginBottom: 0 }}>
+              <label>Selecionar Turma</label>
+              <select value={turmaSel} onChange={e => { setTurmaSel(e.target.value) }}>
+                {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ minWidth: 220, marginBottom: 0 }}>
+              <label>Selecionar Semana</label>
+              <select value={aulaSel} onChange={e => setAulaSel(e.target.value)}>
+                <option value="">— Selecione uma aula —</option>
+                {aulasT.map(a => <option key={a.id} value={a.id}>Aula {a.numero} · {formatarData(a.data)}</option>)}
+              </select>
+            </div>
           </div>
 
-          <div className="cards-grid" style={{ marginBottom: 24 }}>
-            <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{mats.length}</div><div className="stat-label">Total de alunos</div></div>
-            <div className="stat-card"><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{mats.reduce((t, m) => t + getPresencas(m.id), 0)}</div><div className="stat-label">Total de Presenças</div></div>
-            <div className="stat-card"><div className="stat-icon">❌</div><div className="stat-valor" style={{ color: '#9b2226' }}>{mats.reduce((t, m) => t + getFaltas(m.id), 0)}</div><div className="stat-label">Total de Faltas</div></div>
-            <div className="stat-card"><div className="stat-icon">⚠️</div><div className="stat-valor" style={{ color: '#9b2226' }}>{mats.filter(m => getFaltas(m.id) >= 4).length}</div><div className="stat-label">Reprovados</div></div>
-          </div>
+          {/* CARDS DA SEMANA */}
+          {aulaSel && (() => {
+            const presencasAula = mats.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaSel && f.status === 'presente')).length
+            const faltasAula = mats.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaSel && f.status === 'falta')).length
+            const justAula = mats.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaSel && f.status === 'falta_justificada')).length
+            const semReg = mats.filter(m => !frequencias.find(f => f.matricula_id === m.id && f.aula_id === aulaSel)).length
+            return (
+              <div className="cards-grid" style={{ marginBottom: 24 }}>
+                <div className="stat-card" style={{ borderTop: '3px solid #1e40af' }}><div className="stat-icon">👥</div><div className="stat-valor" style={{ color: '#1e40af' }}>{mats.length}</div><div className="stat-label">Alunos na turma</div></div>
+                <div className="stat-card" style={{ borderTop: '3px solid #2d6a4f' }}><div className="stat-icon">✅</div><div className="stat-valor" style={{ color: '#2d6a4f' }}>{presencasAula}</div><div className="stat-label">Presentes</div></div>
+                <div className="stat-card" style={{ borderTop: '3px solid #9b2226' }}><div className="stat-icon">❌</div><div className="stat-valor" style={{ color: '#9b2226' }}>{faltasAula}</div><div className="stat-label">Faltas</div></div>
+                <div className="stat-card" style={{ borderTop: '3px solid #d97706' }}><div className="stat-icon">📝</div><div className="stat-valor" style={{ color: '#d97706' }}>{justAula}</div><div className="stat-label">Justificadas</div></div>
+                <div className="stat-card" style={{ borderTop: '3px solid #999' }}><div className="stat-icon">—</div><div className="stat-valor" style={{ color: '#999' }}>{semReg}</div><div className="stat-label">Sem registro</div></div>
+              </div>
+            )
+          })()}
 
           <div className="card">
             <div className="card-title" style={{ color: cor.primary }}>Situação Individual</div>
