@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase, COR_MODULO, calcularDatasAulas, formatarData } from '../lib/supabase'
-import ImprimirDiario from '../components/ImprimirDiario'
+import ImprimirDiario, { ImprimirPlanilhaEquipes } from '../components/ImprimirDiario'
 
 const ABAS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -590,6 +590,7 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
             </button>
           )}
           {turmaSel && <ImprimirDiario turma={turmaAtual} matriculas={mats} aulas={aulasT} frequencias={frequencias} />}
+          {turmaSel && <ImprimirPlanilhaEquipes turma={turmaAtual} matriculas={mats} aulas={aulasT} frequencias={frequencias} />}
         </div>
       </div>
 
