@@ -4,6 +4,104 @@ import { COR_MODULO, formatarData } from '../lib/supabase'
 const LOGO_ESCOLA = '' // Coordenador cola aqui o base64 da logo
 const LOGO_IGREJA = '' // Coordenador cola aqui o base64 da logo da igreja
 
+export function ImprimirPlanilhaEquipes({ turma, matriculas, aulas, frequencias }) {
+  const EQUIPES = ['Valentes', 'Enoque', 'Inábaláveis', 'Eleitos']
+  const cor = COR_MODULO[turma?.modulo || 1]
+  const aulasOrdenadas = [...aulas].sort((a, b) => a.numero - b.numero)
+  // Só aulas que tiveram chamada
+  const aulasComChamada = aulasOrdenadas.filter(a =>
+    frequencias.some(f => f.aula_id === a.id)
+  )
+
+  function gerarHTML() {
+    const linhasEquipes = EQUIPES.map(eq => {
+      const alunosEq = matriculas.filter(m => m.aluno?.equipe === eq)
+      const total = alunosEq.length
+      if (total === 0) return ''
+
+      const colunas = aulasComChamada.map(a => {
+        const p = alunosEq.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'presente')).length
+        const fa = alunosEq.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta')).length
+        const fj = alunosEq.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta_justificada')).length
+        return `<td style="text-align:center;padding:6px 4px;border:1px solid #e2e8f0;">
+          <div style="font-weight:800;color:#1b4332;font-size:12px;">${p}</div>
+          <div style="color:#9b1c1c;font-size:10px;">${fa > 0 ? fa + 'F' : ''}${fj > 0 ? ' ' + fj + 'FJ' : ''}</div>
+        </td>`
+      }).join('')
+
+      return `<tr>
+        <td style="padding:8px 12px;font-weight:700;border:1px solid #e2e8f0;background:#f8fafc;">${eq}</td>
+        <td style="text-align:center;padding:8px;font-weight:700;color:#1e40af;border:1px solid #e2e8f0;">${total}</td>
+        ${colunas}
+      </tr>`
+    }).join('')
+
+    // Linha de total geral
+    const totalColunas = aulasComChamada.map(a => {
+      const p = matriculas.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'presente')).length
+      const fa = matriculas.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta')).length
+      const fj = matriculas.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta_justificada')).length
+      return `<td style="text-align:center;padding:6px 4px;background:#1b4332;color:#fff;border:1px solid #0a2e1a;">
+        <div style="font-weight:900;font-size:13px;">${p}</div>
+        <div style="font-size:10px;opacity:0.8;">${fa > 0 ? fa + 'F' : ''}${fj > 0 ? ' ' + fj + 'FJ' : ''}</div>
+      </td>`
+    }).join('')
+
+    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:Arial,sans-serif;font-size:12px;padding:20px;color:#111}
+      h1{font-size:20px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:${cor.primary}}
+      h2{font-size:13px;color:#555;font-weight:500;margin-top:4px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px}
+      th{background:${cor.primary};color:#fff;padding:8px 10px;text-align:center;font-size:11px;letter-spacing:0.5px;border:1px solid ${cor.text}}
+      th:first-child{text-align:left}
+      .rodape{margin-top:16px;text-align:center;font-size:9px;color:#888;border-top:1px solid #e2e8f0;padding-top:8px}
+      .legenda{display:flex;gap:16px;margin-bottom:12px;font-size:11px;color:#555}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    </style></head><body>
+    <h1>Escola de Líderes — ${turma.nome}</h1>
+    <h2>Planilha Semanal por Equipes · Módulo ${turma.modulo}</h2>
+    <div class="legenda">
+      <span>✓ = Presenças</span><span>F = Faltas</span><span>FJ = Justificadas</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="min-width:120px;">Equipe</th>
+          <th>Total</th>
+          ${aulasComChamada.map(a => `<th>Aula ${a.numero}<br><span style="font-weight:400;font-size:9px;">${formatarData(a.data)}</span></th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${linhasEquipes}
+        <tr>
+          <td style="padding:8px 12px;font-weight:900;background:#1b4332;color:#fff;border:1px solid #0a2e1a;">TOTAL GERAL</td>
+          <td style="text-align:center;font-weight:900;background:#1b4332;color:#fff;border:1px solid #0a2e1a;">${matriculas.length}</td>
+          ${totalColunas}
+        </tr>
+      </tbody>
+    </table>
+    <div class="rodape">Escola de Líderes — Comunidade Por Amor · ${turma.nome} · Impresso em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+    </body></html>`
+  }
+
+  function imprimir() {
+    const html = gerarHTML()
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank')
+    if (win) { win.onload = () => { win.focus(); win.print() } }
+    setTimeout(() => URL.revokeObjectURL(url), 15000)
+  }
+
+  return (
+    <button className="btn btn-secondary" onClick={imprimir}>
+      📊 Planilha por Equipes
+    </button>
+  )
+}
+
 export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }) {
   const cor = COR_MODULO[turma?.modulo || 1]
 
@@ -201,23 +299,38 @@ export default function ImprimirDiario({ turma, matriculas, aulas, frequencias }
     </div>
   </div>
 
-  <!-- RESUMO DE FREQUÊNCIA -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
-    <div style="background:#d8f3dc;border:1.5px solid #40916c;border-radius:8px;padding:10px 14px;text-align:center;">
-      <div style="font-size:22px;font-weight:900;color:#1b4332;">${matriculasOrdenadas.reduce((t, m) => t + aulas.filter(a => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'presente')).length, 0)}</div>
-      <div style="font-size:10px;font-weight:700;color:#1b4332;text-transform:uppercase;letter-spacing:1px;">Presenças (P)</div>
-    </div>
-    <div style="background:#fee2e2;border:1.5px solid #f87171;border-radius:8px;padding:10px 14px;text-align:center;">
-      <div style="font-size:22px;font-weight:900;color:#9b1c1c;">${matriculasOrdenadas.reduce((t, m) => t + aulas.filter(a => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta')).length, 0)}</div>
-      <div style="font-size:10px;font-weight:700;color:#9b1c1c;text-transform:uppercase;letter-spacing:1px;">Faltas (F)</div>
-    </div>
-    <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:8px;padding:10px 14px;text-align:center;">
-      <div style="font-size:22px;font-weight:900;color:#92400e;">${matriculasOrdenadas.reduce((t, m) => t + aulas.filter(a => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'falta_justificada')).length, 0)}</div>
-      <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Justificadas (FJ)</div>
-    </div>
-    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 14px;text-align:center;">
-      <div style="font-size:22px;font-weight:900;color:#9b1c1c;">${matriculasOrdenadas.filter(m => frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length >= 4).length}</div>
+  <!-- RESUMO POR AULA -->
+  ${aulasOrdenadas.map(a => {
+    const p = matriculasOrdenadas.filter(m => frequencias.find(f => f.matricula_id === m.id && f.aula_id === a.id && f.status === 'presente')).length
+    const f = matriculasOrdenadas.filter(m => frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === a.id && fr.status === 'falta')).length
+    const fj = matriculasOrdenadas.filter(m => frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === a.id && fr.status === 'falta_justificada')).length
+    const sr = matriculasOrdenadas.filter(m => !frequencias.find(fr => fr.matricula_id === m.id && fr.aula_id === a.id)).length
+    if (p === 0 && f === 0 && fj === 0) return ''
+    return `<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;margin-bottom:6px;font-size:12px;">
+      <span style="font-weight:800;color:${cor.primary};min-width:52px;">Aula ${a.numero}</span>
+      <span style="color:#555;min-width:80px;">${formatarData(a.data)}</span>
+      <span style="background:#d8f3dc;color:#1b4332;padding:2px 10px;border-radius:20px;font-weight:800;">✓ ${p} P</span>
+      <span style="background:#fee2e2;color:#9b1c1c;padding:2px 10px;border-radius:20px;font-weight:800;">✗ ${f} F</span>
+      ${fj > 0 ? `<span style="background:#fef3c7;color:#92400e;padding:2px 10px;border-radius:20px;font-weight:800;">📝 ${fj} FJ</span>` : ''}
+      ${sr > 0 ? `<span style="color:#aaa;font-size:11px;">${sr} sem registro</span>` : ''}
+    </div>`
+  }).join('')}
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:10px;margin-bottom:14px;">
+    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:18px;font-weight:900;color:#9b1c1c;">${matriculasOrdenadas.filter(m => frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length >= 4).length}</div>
       <div style="font-size:10px;font-weight:700;color:#9b1c1c;text-transform:uppercase;letter-spacing:1px;">⚠️ Reprovados</div>
+    </div>
+    <div style="background:#d8f3dc;border:1.5px solid #40916c;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:18px;font-weight:900;color:#1b4332;">${matriculasOrdenadas.filter(m => frequencias.filter(f => f.matricula_id === m.id && f.status === 'falta').length === 0).length}</div>
+      <div style="font-size:10px;font-weight:700;color:#1b4332;text-transform:uppercase;letter-spacing:1px;">Sem faltas</div>
+    </div>
+    <div style="background:#fef3c7;border:1.5px solid #fcd34d;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:18px;font-weight:900;color:#92400e;">${matriculasOrdenadas.filter(m => { const f = frequencias.filter(fr => fr.matricula_id === m.id && fr.status === 'falta').length; return f >= 3 && f < 4; }).length}</div>
+      <div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:1px;">⚡ Atenção (3F)</div>
+    </div>
+    <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-size:18px;font-weight:900;color:#1e40af;">${matriculasOrdenadas.length}</div>
+      <div style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:1px;">Total alunos</div>
     </div>
   </div>
 
