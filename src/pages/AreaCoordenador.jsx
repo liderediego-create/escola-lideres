@@ -321,11 +321,14 @@ function GerenciarTurmas({ turmas, alunos, onAtualizar, setMsg }) {
 }
 
 // ── GERENCIAR ALUNOS ─────────────────────────────────────
+const EQUIPES_OPCOES = ['Valentes', 'Enoque', 'Inábaláveis', 'Eleitos']
+
 function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
   const [showForm, setShowForm] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(formVazio())
   const [turmaSelecionada, setTurmaSelecionada] = useState('')
+  const [filtroEquipe, setFiltroEquipe] = useState('')
 
   function formVazio() {
     return { nome: '', email: '', senha_hash: '', perfil: 'aluno' }
@@ -415,7 +418,13 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
           <h1 className="page-title" style={{ color: '#1b4332' }}>ALUNOS</h1>
           <p className="page-subtitle">{alunos.length} alunos cadastrados</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditando(null); setForm(formVazio()) }}>+ Novo Aluno</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select value={filtroEquipe} onChange={e => setFiltroEquipe(e.target.value)} style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#1b4332', fontWeight: 600 }}>
+            <option value="">Todas as equipes</option>
+            {EQUIPES_OPCOES.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+          </select>
+          <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditando(null); setForm(formVazio()) }}>+ Novo Aluno</button>
+        </div>
       </div>
 
       {showForm && (
@@ -475,11 +484,11 @@ function GerenciarAlunos({ alunos, turmas, matriculas, onAtualizar, setMsg }) {
           <table>
             <thead>
               <tr>
-                <th>Matrícula</th><th>Nome</th><th>Turma</th><th>Status</th><th>Ações</th>
+                <th>Matrícula</th><th>Nome</th><th>Equipe</th><th>Turma</th><th>Status</th><th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {alunos.map(a => {
+              {alunos.filter(a => !filtroEquipe || a.equipe === filtroEquipe).map(a => {
                 const mat = matriculas.find(m => m.aluno_id === a.id)
                 const cor = mat ? COR_MODULO[mat.turma?.modulo || 1] : COR_MODULO[1]
                 return (
@@ -516,8 +525,9 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
   const [chamada, setChamada] = useState({})
   const [salvando, setSalvando] = useState(false)
   const [msg, setMsg] = useState('')
+  const [filtroEquipe, setFiltroEquipe] = useState('')
 
-  const mats = matriculas.filter(m => m.turma_id === turmaSel)
+  const mats = matriculas.filter(m => m.turma_id === turmaSel && (!filtroEquipe || m.aluno?.equipe === filtroEquipe))
     .sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'))
   const aulasT = aulas.filter(a => a.turma_id === turmaSel).sort((a, b) => a.numero - b.numero)
   const turmaAtual = turmas.find(t => t.id === turmaSel)
@@ -596,12 +606,19 @@ function VerFrequencia({ turmas, matriculas, aulas, frequencias, onAtualizar }) 
 
       {msg && <div className="msg-ok" style={{ marginBottom: 12 }}>{msg}</div>}
 
-      {/* Seleção de turma e aula */}
+      {/* Seleção de turma, equipe e aula */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <div className="form-group" style={{ minWidth: 280, marginBottom: 0 }}>
           <label>Turma</label>
           <select value={turmaSel} onChange={e => { setTurmaSel(e.target.value); setAulaSel(null) }}>
             {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
+          </select>
+        </div>
+        <div className="form-group" style={{ minWidth: 180, marginBottom: 0 }}>
+          <label>Filtrar por Equipe</label>
+          <select value={filtroEquipe} onChange={e => setFiltroEquipe(e.target.value)}>
+            <option value="">Todas as equipes</option>
+            {EQUIPES_OPCOES.map(eq => <option key={eq} value={eq}>{eq}</option>)}
           </select>
         </div>
         <div className="form-group" style={{ minWidth: 200, marginBottom: 0 }}>
@@ -823,6 +840,7 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
   const [turmaSel, setTurmaSel] = useState(turmas[0]?.id || '')
   const [equipeSel, setEquipeSel] = useState('Valentes')
   const [aulaSel, setAulaSel] = useState('')
+  const [filtroEquipe, setFiltroEquipe] = useState('')
 
   function getFaltas(matId) {
     return frequencias.filter(f => f.matricula_id === matId && f.status === 'falta').length
@@ -832,7 +850,7 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
   }
 
   // ── MODO TURMA ──
-  const mats = matriculas.filter(m => m.turma_id === turmaSel)
+  const mats = matriculas.filter(m => m.turma_id === turmaSel && (!filtroEquipe || m.aluno?.equipe === filtroEquipe))
     .sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'))
   const aulasT = aulas.filter(a => a.turma_id === turmaSel)
   const turma = turmas.find(t => t.id === turmaSel)
@@ -941,6 +959,13 @@ function Relatorios({ turmas, matriculas, aulas, frequencias, alunos }) {
               <label>Selecionar Turma</label>
               <select value={turmaSel} onChange={e => { setTurmaSel(e.target.value) }}>
                 {turmas.map(t => <option key={t.id} value={t.id}>Módulo {t.modulo} — {t.nome}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ minWidth: 180, marginBottom: 0 }}>
+              <label>Filtrar por Equipe</label>
+              <select value={filtroEquipe} onChange={e => setFiltroEquipe(e.target.value)}>
+                <option value="">Todas as equipes</option>
+                {EQUIPES_OPCOES.map(eq => <option key={eq} value={eq}>{eq}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ minWidth: 220, marginBottom: 0 }}>
