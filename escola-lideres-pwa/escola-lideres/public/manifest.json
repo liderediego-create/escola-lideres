@@ -1,0 +1,26 @@
+{
+  "name": "Escola de Líderes — Comunidade Por Amor",
+  "short_name": "Escola de Líderes",
+  "description": "Sistema da Escola de Líderes da Comunidade Por Amor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2d6a4f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education"],
+  "lang": "pt-BR"
+}
